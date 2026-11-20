@@ -1,0 +1,38 @@
+{
+  "prev_manifest_url": "https://raw.githubusercontent.com/lcuwx2016/sr-rules/data/manifest.json",
+  "ratio_guard": 0.5,
+  "jobs": [
+    {
+      "name": "geosite-category-ads-all",
+      "min_lines": 50000,
+      "kind": "lst",
+      "sources": [
+        "https://raw.githubusercontent.com/wx2020/smartdns-rules/data/geosite-category-ads-all.lst"
+      ]
+    },
+    {
+      "name": "cn",
+      "min_lines": 10000,
+      "kind": "lst",
+      "sources": [
+        "https://raw.githubusercontent.com/wx2020/smartdns-rules/data/cn.lst"
+      ]
+    },
+    {
+      "name": "not-cn",
+      "min_lines": 5000,
+      "kind": "lst",
+      "sources": [
+        "https://raw.githubusercontent.com/wx2020/smartdns-rules/data/not-cn.lst"
+      ]
+    },
+    {
+      "name": "geosite-gfw",
+      "min_lines": 1000,
+      "kind": "ruleset-json",
+      "sources": [
+        "https://raw.githubusercontent.com/flyzstu/sing-box-rules/rule-set-geosite/geosite-gfw.json"
+      ]
+    }
+  ]
+}

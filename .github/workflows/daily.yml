@@ -1,0 +1,78 @@
+name: build-sr-rules
+
+on:
+  schedule:
+    # UTC 19:30 == Asia/Shanghai 03:30（晚于 smartdns-rules 的 19:20，确保上游已产出当日数据）
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: build-sr-rules
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build
+        run: python3 convert.py --out-dir dist --sources sources.json
+
+      - name: Show manifest
+        run: cat dist/manifest.json
+
+      - name: Publish to data branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: data
+          publish_dir: ./dist
+          force_orphan: true
+          enable_jekyll: false
+
+      - name: Compute tag
+        id: tag
+        run: |
+          base="data-$(date -u +%Y%m%d)"
+          if git ls-remote --tags origin "refs/tags/${base}" | grep -q "refs/tags/${base}$"; then
+            base="${base}-$(date -u +%H%M%S)"
+          fi
+          echo "tag=${base}" >> "$GITHUB_OUTPUT"
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          make_latest: true
+          body: |
+            Daily Shadowrocket rules built from smartdns-rules + flyzstu geosite.
+
+            - 广告 REJECT: ads-custom.lst + geosite-category-ads-all
+            - GFW PROXY: geosite-gfw (before CN, matching gw route order)
+            - 国内 DIRECT: cn.lst + GEOIP,CN,DIRECT
+            - 兜底: FINAL,PROXY
+            - not-cn 归档（IPv6 抑制由 ipv6=false 表达）
+
+            See manifest.json for counts and sha256.
+          files: |
+            dist/manifest.json
+            dist/sr-rules.conf
+            dist/sr-rules.conf.sha256
+            dist/cn.lst
+            dist/cn.lst.sha256
+            dist/not-cn.lst
+            dist/not-cn.lst.sha256
+            dist/geosite-category-ads-all.lst
+            dist/geosite-category-ads-all.lst.sha256
+            dist/geosite-gfw.lst
+            dist/geosite-gfw.lst.sha256
