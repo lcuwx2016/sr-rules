@@ -17,7 +17,8 @@
 ## 关键设计
 
 - **GFW 段排在 CN 段之前**：匹配上游 `geosite-gfw` 早于 `geoip-cn` 的顺序，套 CF 但命中 gfw 的域名（如 `*.pages.dev`）仍走代理。
-- **ipv6=true + not-cn 参与生成（2026-11-20 用户纠正后定案）**：早先 `ipv6=false` 是错误推导（用户从未要求全局关 IPv6，且与上游「IPv6 开、仅抑制境外 AAAA」语义相反——会误关国内域名 IPv6）。现改为 `ipv6=true` 保留国内 IPv6 直连；not-cn.lst 参与规则生成，写成 `DOMAIN-SUFFIX,...,PROXY` 插在 GFW 段之后、CN 段之前，并**剔除与 cn 重叠的 156 个域名**（如 futuniuniu.com/265.com，避免误伤国内站）。净新增约 22815 条 PROXY。
+- **ipv6=true + not-cn 参与生成（2026-11-20 用户纠正后定案）**：早先 `ipv6=false` 是错误推导（用户从未要求全局关 IPv6，且与上游「IPv6 开、仅抑制境外 AAAA」语义相反——会误关国内域名 IPv6）。现改为 `ipv6=true` 保留国内 IPv6 直连；not-cn.lst 参与规则生成，写成 `DOMAIN-SUFFIX,...,PROXY`，**排在 CN 段之后**（更窄的 DIRECT 先命中）。剔除与 cn 重叠的 156 个域名 + Apple 根域，避免误伤。
+- **Apple 根域整体直连（2026-11-20）**：上游 sing-box 用 DNS 规则 `geosite-apple → dns_local` + route.rules `geosite-apple → direct` 让 apple 全家直连（但其 DNS 模块在该机未监听端口、链路实为 dnsmasq→smartdns，apple 直连真正靠 cn.lst 国内解析 + geoip-cn + sniff）。sr 对齐做法：`APPLE_DIRECT_ROOTS`（apple.com/icloud.com/mzstatic.com/itunes.com/me.com/aaplimg.com/apple-dns.net/apple-mapkit.com/apple-cloudkit.com）显式写 DIRECT，并从 not-cn 段剔除。段序对调后 apple 子域（www/itunes/music/a1.mzstatic）也各自命中 cn 的 DIRECT，不再被根域 PROXY 抢走。`DOMAIN-SUFFIX` 是后缀匹配（含裸域本身+所有子域），「更窄的写更前」是 Shadowrocket 官方原则。
 - **GEOIP,CN,DIRECT 不加 no-resolve（稳妥方案）**：加 no-resolve 会失去对「未收录国内域名」的 GEOIP 捞回兜底，使其掉进 FINAL 走代理；境外漏网域名由上一段的 not-cn 显式 PROXY 解决，误判风险可控。`dns-server` 在国外分流阶段不参与（域名类规则不经 DNS，仅 GEOIP 需要本地解析），不会走运营商 DNS。
 - **CF anycast 直连段按用户要求不生成**。
 - 跨策略重复（域名既在广告 REJECT 又在 GFW PROXY / CN DIRECT）是按 first-match 优先级命中的预期设计。

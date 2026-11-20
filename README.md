@@ -26,8 +26,8 @@
 1. 广告 REJECT（`ads-custom` 前置 + `geosite-category-ads-all`）
 2. 内网/特殊直连（`IP-CIDR DIRECT` + `skip-proxy`/`bypass-tun`）
 3. GFW 域名 PROXY —— **先于国内段**，匹配上游 `geosite-gfw` 早于 `geoip-cn` 的顺序
-4. not-cn 域名 PROXY —— 境外域名显式走代理；与 cn 名单重叠的 156 个域名已剔除，避免误伤国内站
-5. 国内域名 DIRECT + `GEOIP,CN,DIRECT`（**不带 `no-resolve`**：保留对「未收录国内域名」的 GEOIP 兜底，避免它们掉进 FINAL 走代理）
+4. 国内域名 DIRECT —— 含 Apple 根域整体直连（对齐上游 geosite-apple）；后接 `GEOIP,CN,DIRECT`（**不带 `no-resolve`**：保留对「未收录国内域名」的 GEOIP 兜底）
+5. not-cn 域名 PROXY —— 排在**国内段之后**：更窄的 DIRECT 先命中，避免 `apple.com` 这类根域宽规则抢走 `www.apple.com` 等子域；与 cn 重叠的 156 个域名及 Apple 根域已剔除
 6. `FINAL,PROXY`
 
 `[General]` 设 `ipv6=true`，保留国内域名的 IPv6 直连；境外域名靠 not-cn 段显式 PROXY 拦截，而非靠全局关闭 IPv6。`dns-server` 用国内 DoH，仅服务「直连域名建连 + 代理节点域名」的本地解析；域名类规则按字符串匹配不经 DNS，落到 GEOIP 的域名才触发本地解析。

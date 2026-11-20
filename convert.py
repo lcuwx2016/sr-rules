@@ -41,6 +41,11 @@ DIRECT_CIDRS = [
     "192.168.0.0/16", "10.0.0.0/8", "100.64.0.0/10", "10.64.0.0/24",
     "172.19.0.0/30", "127.0.0.0/8", "52.198.175.31/32",
 ]
+# Apple 根域整体直连，对齐上游 geosite-apple 集合（apple.com/icloud.com 等被 not-cn 判境外）
+APPLE_DIRECT_ROOTS = [
+    "apple.com", "icloud.com", "mzstatic.com", "itunes.com", "me.com",
+    "aaplimg.com", "apple-dns.net", "apple-mapkit.com", "apple-cloudkit.com",
+]
 
 
 def fetch(url: str) -> bytes:
@@ -145,9 +150,10 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, genera
     a("#   1 广告 REJECT (ads-custom 前置 + geosite-category-ads-all + IP 降级清单)")
     a("#   2 内网/特殊直连")
     a("#   3 GFW 域名 PROXY (先于 CN，匹配上游 gfw 早于 cn 的顺序)")
-    a("#   3b not-cn 域名 PROXY (排除与 cn 重叠者，避免误伤国内站)")
-    a("#   4 国内域名 DIRECT + GEOIP,CN,DIRECT (不带 no-resolve，保留国内漏网域名的 GEOIP 兜底)")
+    a("#   4 国内域名 DIRECT (含 apple 根域整体直连) + GEOIP,CN,DIRECT")
+    a("#   3b not-cn 域名 PROXY (排在 CN 之后：更窄的 DIRECT 先命中，避免根域宽规则抢走子域)")
     a("#   5 FINAL,PROXY")
+    a("#   GEOIP 不带 no-resolve，保留国内漏网域名的 GEOIP 兜底")
     a("#   ipv6=true：保留国内域名 IPv6 直连；境外域名由 not-cn 段显式 PROXY，不靠全局关 IPv6")
     a("")
     a("[General]")
@@ -184,19 +190,23 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, genera
     for d in jobs["geosite-gfw"]:
         a(f"DOMAIN-SUFFIX,{d},PROXY")
     a("")
-    a("# ===== 3b. not-cn 域名 PROXY（排除与 cn 重叠的 156 个，避免误伤国内站） =====")
-    cn_set = set(jobs["cn"])
+    a("# ===== 4. 国内域名 DIRECT =====")
+    for d in jobs["cn"]:
+        a(f"DOMAIN-SUFFIX,{d},DIRECT")
+    # Apple 根域整体直连（对齐上游 geosite-apple）：这些根域在 not-cn 里被判境外，
+    # 但其子域在 cn 里判国内；若不在此显式 DIRECT，会被后面 not-cn 的根域 PROXY 抢走。
+    for d in APPLE_DIRECT_ROOTS:
+        a(f"DOMAIN-SUFFIX,{d},DIRECT")
+    a("GEOIP,CN,DIRECT")
+    a("")
+    a("# ===== 3b. not-cn 域名 PROXY（排除与 cn 重叠的 156 个 + apple 根域，避免误伤） =====")
+    cn_set = set(jobs["cn"]) | set(APPLE_DIRECT_ROOTS)
     notcn_seen = set()
     for d in jobs["not-cn"]:
         if d in cn_set or d in notcn_seen:
             continue
         notcn_seen.add(d)
         a(f"DOMAIN-SUFFIX,{d},PROXY")
-    a("")
-    a("# ===== 4. 国内域名 DIRECT =====")
-    for d in jobs["cn"]:
-        a(f"DOMAIN-SUFFIX,{d},DIRECT")
-    a("GEOIP,CN,DIRECT")
     a("")
     a("# ===== 5. 兜底 =====")
     a("FINAL,PROXY")
