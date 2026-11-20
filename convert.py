@@ -145,12 +145,13 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, genera
     a("#   1 广告 REJECT (ads-custom 前置 + geosite-category-ads-all + IP 降级清单)")
     a("#   2 内网/特殊直连")
     a("#   3 GFW 域名 PROXY (先于 CN，匹配上游 gfw 早于 cn 的顺序)")
-    a("#   4 国内域名 DIRECT + GEOIP,CN,DIRECT")
+    a("#   3b not-cn 域名 PROXY (排除与 cn 重叠者，避免误伤国内站)")
+    a("#   4 国内域名 DIRECT + GEOIP,CN,DIRECT (不带 no-resolve，保留国内漏网域名的 GEOIP 兜底)")
     a("#   5 FINAL,PROXY")
-    a("#   not-cn 不逐条列入：境外 AAAA 抑制已由 ipv6=false 表达")
+    a("#   ipv6=true：保留国内域名 IPv6 直连；境外域名由 not-cn 段显式 PROXY，不靠全局关 IPv6")
     a("")
     a("[General]")
-    a("ipv6 = false")
+    a("ipv6 = true")
     a("bypass-system = true")
     a(f"skip-proxy = {SKIP_PROXY}")
     a(f"bypass-tun = {BYPASS_TUN}")
@@ -181,6 +182,15 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, genera
     a("")
     a("# ===== 3. GFW 域名 PROXY =====")
     for d in jobs["geosite-gfw"]:
+        a(f"DOMAIN-SUFFIX,{d},PROXY")
+    a("")
+    a("# ===== 3b. not-cn 域名 PROXY（排除与 cn 重叠的 156 个，避免误伤国内站） =====")
+    cn_set = set(jobs["cn"])
+    notcn_seen = set()
+    for d in jobs["not-cn"]:
+        if d in cn_set or d in notcn_seen:
+            continue
+        notcn_seen.add(d)
         a(f"DOMAIN-SUFFIX,{d},PROXY")
     a("")
     a("# ===== 4. 国内域名 DIRECT =====")

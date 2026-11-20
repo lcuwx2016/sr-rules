@@ -26,10 +26,11 @@
 1. 广告 REJECT（`ads-custom` 前置 + `geosite-category-ads-all`）
 2. 内网/特殊直连（`IP-CIDR DIRECT` + `skip-proxy`/`bypass-tun`）
 3. GFW 域名 PROXY —— **先于国内段**，匹配上游 `geosite-gfw` 早于 `geoip-cn` 的顺序
-4. 国内域名 DIRECT + `GEOIP,CN,DIRECT`
-5. `FINAL,PROXY`
+4. not-cn 域名 PROXY —— 境外域名显式走代理；与 cn 名单重叠的 156 个域名已剔除，避免误伤国内站
+5. 国内域名 DIRECT + `GEOIP,CN,DIRECT`（**不带 `no-resolve`**：保留对「未收录国内域名」的 GEOIP 兜底，避免它们掉进 FINAL 走代理）
+6. `FINAL,PROXY`
 
-`[General]` 设 `ipv6=false`，对应全 IPv6 直连与 `not-cn` 抑制 AAAA。
+`[General]` 设 `ipv6=true`，保留国内域名的 IPv6 直连；境外域名靠 not-cn 段显式 PROXY 拦截，而非靠全局关闭 IPv6。`dns-server` 用国内 DoH，仅服务「直连域名建连 + 代理节点域名」的本地解析；域名类规则按字符串匹配不经 DNS，落到 GEOIP 的域名才触发本地解析。
 
 无法用 Shadowrocket 语法表达的系统层行为（按源 IP 绕 TUN、端口协议直连、fake-ip、cf_alias ip-alias、DoT 经代理等）在 conf 头部逐条注明。
 
