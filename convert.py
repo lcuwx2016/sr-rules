@@ -199,11 +199,13 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, genera
         a(f"DOMAIN-SUFFIX,{d},DIRECT")
     a("GEOIP,CN,DIRECT")
     a("")
-    a("# ===== 3b. not-cn 域名 PROXY（排除与 cn 重叠的 156 个 + apple 根域，避免误伤） =====")
-    cn_set = set(jobs["cn"]) | set(APPLE_DIRECT_ROOTS)
+    a("# ===== 3b. not-cn 域名 PROXY（去掉 cn / apple / gfw 已覆盖者，纯去重） =====")
+    # gfw 段在前已命中，not-cn 里重复的 4287 个删掉不改变 first-match 结果；
+    # cn / apple 重叠者剔除避免误伤（与之前一致）。
+    covered = set(jobs["cn"]) | set(APPLE_DIRECT_ROOTS) | set(jobs["geosite-gfw"])
     notcn_seen = set()
     for d in jobs["not-cn"]:
-        if d in cn_set or d in notcn_seen:
+        if d in covered or d in notcn_seen:
             continue
         notcn_seen.add(d)
         a(f"DOMAIN-SUFFIX,{d},PROXY")
