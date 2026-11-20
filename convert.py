@@ -7,7 +7,7 @@
 
 sr-rules.conf 的段序语义：
   1 广告 REJECT → 2 内网直连 → 3 GFW PROXY → 4 国内 DIRECT → 5 FINAL,PROXY
-  （GFW 排在 CN 之前，匹配 GW 上 geosite-gfw(6) 早于 geoip-cn(8)）
+  （GFW 排在 CN 之前，匹配上游路由中 geosite-gfw 早于 geoip-cn 的顺序）
 纯标准库，无第三方依赖。
 """
 from __future__ import annotations
@@ -116,7 +116,24 @@ def load_custom_ads(path: Path) -> list:
     return out
 
 
-def build_conf(out: Path, jobs: dict, custom_ads: list, generated_at: str) -> Path:
+def load_ip_reject(path: Path) -> list:
+    """读入 IP+端口降级清单（CIDR 列表）；忽略注释与空行。"""
+    if not path.exists():
+        print(f"[warn] {path} not found, skip ip reject", file=sys.stderr)
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if "/" not in s:
+            print(f"[warn] invalid CIDR in ip-reject: {s}", file=sys.stderr)
+            continue
+        out.append(s)
+    return out
+
+
+def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, generated_at: str) -> Path:
     lines = []
     a = lines.append
     a("# Shadowrocket 规则 — 由 sr-rules 每日构建")
@@ -125,12 +142,12 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, generated_at: str) -> Pa
     a("# 分流语义：去广告 + 国内外划分")
     a("#")
     a("# 段序 (first-match):")
-    a("#   1 广告 REJECT (ads-custom 前置 + geosite-category-ads-all)")
+    a("#   1 广告 REJECT (ads-custom 前置 + geosite-category-ads-all + IP 降级清单)")
     a("#   2 内网/特殊直连")
-    a("#   3 GFW 域名 PROXY (先于 CN，匹配 GW 的 gfw(6) 早于 cn(8))")
+    a("#   3 GFW 域名 PROXY (先于 CN，匹配上游 gfw 早于 cn 的顺序)")
     a("#   4 国内域名 DIRECT + GEOIP,CN,DIRECT")
     a("#   5 FINAL,PROXY")
-    a("#   not-cn 不逐条列入：GW 的境外 AAAA 抑制已由 ipv6=false 表达")
+    a("#   not-cn 不逐条列入：境外 AAAA 抑制已由 ipv6=false 表达")
     a("")
     a("[General]")
     a("ipv6 = false")
@@ -150,6 +167,10 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, generated_at: str) -> Pa
         if d not in ad_seen:
             ad_seen.add(d)
             a(f"DOMAIN-SUFFIX,{d},REJECT")
+    a("")
+    a("# ===== 1b. IP+端口广告规则降级为全端口 REJECT（原 port 80/443/8091 限定） =====")
+    for cidr in ip_rejects:
+        a(f"IP-CIDR,{cidr},REJECT")
     a("")
     a("# ===== 2. 内网/特殊直连 =====")
     for cidr in DIRECT_CIDRS:
@@ -179,6 +200,7 @@ def main() -> None:
     ap.add_argument("--out-dir", default="dist")
     ap.add_argument("--sources", default="sources.json")
     ap.add_argument("--custom-ads", default="ads-custom.lst")
+    ap.add_argument("--ip-reject", default="ads-ip-reject.lst")
     ap.add_argument("--prev-manifest-url", default=None)
     ap.add_argument("--ratio-guard", type=float, default=None)
     args = ap.parse_args()
@@ -227,7 +249,12 @@ def main() -> None:
         domains_by_job[name] = lines
         print(f"[{name}] {count} domains")
 
-    conf = build_conf(out, domains_by_job, load_custom_ads(Path(args.custom_ads)), generated_at)
+    conf = build_conf(
+        out, domains_by_job,
+        load_custom_ads(Path(args.custom_ads)),
+        load_ip_reject(Path(args.ip_reject)),
+        generated_at,
+    )
     conf_digest = sha256_file(conf)
     (out / "sr-rules.conf.sha256").write_text(
         f"{conf_digest}  sr-rules.conf\n", encoding="ascii"

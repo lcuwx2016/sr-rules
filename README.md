@@ -17,19 +17,21 @@
 | `not-cn` | `wx2020/smartdns-rules@data/not-cn.lst` | 归档（境外 AAAA 抑制由 `ipv6=false` 表达，不逐条列入 conf） |
 | `geosite-gfw` | `flyzstu/sing-box-rules@rule-set-geosite/geosite-gfw.json` | GFW 域名 PROXY |
 
-`ads-custom.lst` 是从 GW 导出的自定义广告域名（196 行），静态纳入仓库，构建时前置叠加在广告段最前。
+`ads-custom.lst` 是自定义广告域名清单（395 行），静态纳入仓库，构建时前置叠加在广告段最前。其中 196 行来自上游文件，另 196 行是 sr 侧补充（微信广告域名 `wxsmw.wxs.qq.com` + 头条 byteimg 广告图正则 `^p[0-9]+-` 展开为 `p1~p99` 的具体域名——Shadowrocket 无 `DOMAIN-REGEX` 规则类型，只能展开）。
+
+另有一组 **IP+端口降级规则**存于 `ads-ip-reject.lst`（8 个硬编码 DNS/广告 IP）。上游原规则是 `ip_cidr + port [80,443/8091]` 组合拦截，Shadowrocket 单维度规则无法表达，故降级为全端口 `IP-CIDR,...,REJECT`，在广告段之后、内网直连段之前输出。这些 IP 本就是硬编码 DNS/广告 IP，全拦符合意图；sr 的 `dns-server` 走 DoH，不受影响。纯端口规则（8091）无法表达，已丢弃。
 
 ## sr-rules.conf 段序
 
 1. 广告 REJECT（`ads-custom` 前置 + `geosite-category-ads-all`）
 2. 内网/特殊直连（`IP-CIDR DIRECT` + `skip-proxy`/`bypass-tun`）
-3. GFW 域名 PROXY —— **先于国内段**，忠实复刻 GW 上 `geosite-gfw(6)` 早于 `geoip-cn(8)` 的顺序
+3. GFW 域名 PROXY —— **先于国内段**，匹配上游 `geosite-gfw` 早于 `geoip-cn` 的顺序
 4. 国内域名 DIRECT + `GEOIP,CN,DIRECT`
 5. `FINAL,PROXY`
 
-`[General]` 设 `ipv6=false`，对应 GW 全 IPv6 直连与 smartdns `not-cn` 抑制 AAAA。
+`[General]` 设 `ipv6=false`，对应全 IPv6 直连与 `not-cn` 抑制 AAAA。
 
-无法用 Shadowrocket 语法表达的 GW 系统层行为（按源 IP 绕 TUN、端口协议直连、fake-ip、cf_alias ip-alias、DoT 经代理等）在 conf 头部逐条注明。
+无法用 Shadowrocket 语法表达的系统层行为（按源 IP 绕 TUN、端口协议直连、fake-ip、cf_alias ip-alias、DoT 经代理等）在 conf 头部逐条注明。
 
 ## 守卫
 
