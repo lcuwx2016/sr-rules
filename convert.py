@@ -195,6 +195,9 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, genera
     # 删掉不改变 first-match 结果（cn 段本次约 69 条，含被裸 "cn" 遮蔽的 10 条）。
     direct_emitted = set()
     for d in jobs["cn"]:
+        # 裸 "cn" 规则已覆盖整个 .cn 域，所有 *.cn 独立条目均为冗余，直接过滤
+        if d.endswith(".cn"):
+            continue
         parts = d.split(".")
         if any(".".join(parts[i:]) in direct_emitted for i in range(1, len(parts))):
             continue
