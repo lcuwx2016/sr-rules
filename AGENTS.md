@@ -21,7 +21,8 @@
 - **Apple 根域整体直连（2026-11-20）**：上游 sing-box 用 DNS 规则 `geosite-apple → dns_local` + route.rules `geosite-apple → direct` 让 apple 全家直连（但其 DNS 模块在该机未监听端口、链路实为 dnsmasq→smartdns，apple 直连真正靠 cn.lst 国内解析 + geoip-cn + sniff）。sr 对齐做法：`APPLE_DIRECT_ROOTS`（apple.com/icloud.com/mzstatic.com/itunes.com/me.com/aaplimg.com/apple-dns.net/apple-mapkit.com/apple-cloudkit.com）显式写 DIRECT，并从 not-cn 段剔除。段序对调后 apple 子域（www/itunes/music/a1.mzstatic）也各自命中 cn 的 DIRECT，不再被根域 PROXY 抢走。`DOMAIN-SUFFIX` 是后缀匹配（含裸域本身+所有子域），「更窄的写更前」是 Shadowrocket 官方原则。
 - **GEOIP,CN,DIRECT 不加 no-resolve（稳妥方案）**：加 no-resolve 会失去对「未收录国内域名」的 GEOIP 捞回兜底，使其掉进 FINAL 走代理；境外漏网域名由上一段的 not-cn 显式 PROXY 解决，误判风险可控。`dns-server` 在国外分流阶段不参与（域名类规则不经 DNS，仅 GEOIP 需要本地解析），不会走运营商 DNS。
 - **CF anycast 直连段按用户要求不生成**。
-- **gfw 段保留且不与 not-cn 合并（2026-11-20）**：gfw 段（4434）有 111 个不在 not-cn 的独有域名（如 api.steampowered.com）+ 36 个 gfw∩cn 冲突域名（富途系列，靠 gfw 段压过 cn 直连，对齐上游 gfw 早于 cn 的设计），故不能删；但 not-cn 段与 gfw 重复的 4287 条已去重（gfw 在前已命中，去重后两段 PROXY 并集恒 27339、first-match 不变）。当前 gfw 4434 / not-cn 22905 条。
+- **gfw 段保留且不与 not-cn 合并（2026-11-20）**：gfw 段（4434）有 111 个不在 not-cn 的独有域名（如 api.steampowered.com）+ 36 个 gfw∩cn 冲突域名（富途系列，靠 gfw 段压过 cn 直连，对齐上游 gfw 早于 cn 的设计），故不能删；但 not-cn 段与 gfw 重复的 4287 条已去重（gfw 在前已命中，去重后两段 PROXY 并集恒 27339、first-match 不变）。当前 gfw 4434 / not-cn 22335 条。
+- **not-cn 遮蔽去重（2026-11-20）**：DOMAIN-SUFFIX 是后缀匹配，not-cn 段内若窄域名的真后缀已在前面输出为 PROXY（gfw 段或更早 not-cn 条目），该窄域名永远命中不到。convert.py 按 first-match 顺序维护 `proxy_emitted` 集合并跳过这类窄域名（如 `amp.akamaized.net` 被 `akamaized.net` 遮蔽）。本次去掉 570 条，被删者 0 例外均可由前置 PROXY 后缀解释，段内剩余遮蔽=0，first-match 结果不变。
 - 跨策略重复（域名既在广告 REJECT 又在 GFW PROXY / CN DIRECT）是按 first-match 优先级命中的预期设计。
 
 ## GitHub Actions 要点

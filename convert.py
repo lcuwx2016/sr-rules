@@ -199,15 +199,28 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, genera
         a(f"DOMAIN-SUFFIX,{d},DIRECT")
     a("GEOIP,CN,DIRECT")
     a("")
-    a("# ===== 3b. not-cn 域名 PROXY（去掉 cn / apple / gfw 已覆盖者，纯去重） =====")
-    # gfw 段在前已命中，not-cn 里重复的 4287 个删掉不改变 first-match 结果；
-    # cn / apple 重叠者剔除避免误伤（与之前一致）。
+    a("# ===== 3b. not-cn 域名 PROXY（遮蔽去重：删被前置宽规则覆盖的窄域名） =====")
+    # 两类剔除，均不改变 first-match 结果：
+    #   1) cn/apple/gfw 已覆盖者（误伤防护 + 跨段去重）
+    #   2) 被「前置 PROXY 宽后缀」遮蔽的窄域名：DOMAIN-SUFFIX 是后缀匹配，
+    #      若某条窄域名的真后缀已在前面输出过（gfw 段或更早的 not-cn 条目），
+    #      它永远不会被命中——同策略 PROXY，删掉纯属去冗余。
     covered = set(jobs["cn"]) | set(APPLE_DIRECT_ROOTS) | set(jobs["geosite-gfw"])
+    proxy_emitted = set(jobs["geosite-gfw"])  # gfw 段在前，全部已输出为 PROXY 后缀
     notcn_seen = set()
     for d in jobs["not-cn"]:
         if d in covered or d in notcn_seen:
             continue
+        parts = d.split(".")
+        shadowed = False
+        for i in range(1, len(parts)):
+            if ".".join(parts[i:]) in proxy_emitted:
+                shadowed = True
+                break
+        if shadowed:
+            continue
         notcn_seen.add(d)
+        proxy_emitted.add(d)
         a(f"DOMAIN-SUFFIX,{d},PROXY")
     a("")
     a("# ===== 5. 兜底 =====")
