@@ -190,8 +190,15 @@ def build_conf(out: Path, jobs: dict, custom_ads: list, ip_rejects: list, genera
     for d in jobs["geosite-gfw"]:
         a(f"DOMAIN-SUFFIX,{d},PROXY")
     a("")
-    a("# ===== 4. 国内域名 DIRECT =====")
+    a("# ===== 4. 国内域名 DIRECT（遮蔽去重：删被前置宽规则覆盖的窄域名） =====")
+    # DOMAIN-SUFFIX 是后缀匹配，窄域名若真后缀已在前面输出为 DIRECT，则永远命中不到，
+    # 删掉不改变 first-match 结果（cn 段本次约 69 条，含被裸 "cn" 遮蔽的 10 条）。
+    direct_emitted = set()
     for d in jobs["cn"]:
+        parts = d.split(".")
+        if any(".".join(parts[i:]) in direct_emitted for i in range(1, len(parts))):
+            continue
+        direct_emitted.add(d)
         a(f"DOMAIN-SUFFIX,{d},DIRECT")
     # Apple 根域整体直连（对齐上游 geosite-apple）：这些根域在 not-cn 里被判境外，
     # 但其子域在 cn 里判国内；若不在此显式 DIRECT，会被后面 not-cn 的根域 PROXY 抢走。

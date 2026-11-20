@@ -26,7 +26,7 @@
 1. 广告 REJECT（`ads-custom` 前置 + `geosite-category-ads-all`）
 2. 内网/特殊直连（`IP-CIDR DIRECT` + `skip-proxy`/`bypass-tun`）
 3. GFW 域名 PROXY —— **先于国内段**，匹配上游 `geosite-gfw` 早于 `geoip-cn` 的顺序
-4. 国内域名 DIRECT —— 含 Apple 根域整体直连（对齐上游 geosite-apple）；后接 `GEOIP,CN,DIRECT`（**不带 `no-resolve`**：保留对「未收录国内域名」的 GEOIP 兜底）
+4. 国内域名 DIRECT —— 含 Apple 根域整体直连（对齐上游 geosite-apple）；同样做遮蔽去重（删被前置宽 DIRECT 覆盖的 69 条窄域名，如被 `itunes.apple.com` 遮蔽的 `play.itunes.apple.com`、被裸 `cn` 遮蔽的 `hospital.pku.edu.cn`）；后接 `GEOIP,CN,DIRECT`（**不带 `no-resolve`**：保留对「未收录国内域名」的 GEOIP 兜底）
 5. not-cn 域名 PROXY —— 排在**国内段之后**：更窄的 DIRECT 先命中，避免 `apple.com` 这类根域宽规则抢走 `www.apple.com` 等子域；与 cn 重叠的 156 个域名及 Apple 根域已剔除；再做**遮蔽去重**——凡窄域名的真后缀已在前面输出为 PROXY（gfw 段或更早的 not-cn 条目）即跳过（如 `amp.akamaized.net` 被 `akamaized.net` 遮蔽），这类窄域名永远命中不到，删掉不改变结果（本次去掉 570 条）
 6. `FINAL,PROXY`
 

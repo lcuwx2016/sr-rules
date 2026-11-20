@@ -23,6 +23,7 @@
 - **CF anycast 直连段按用户要求不生成**。
 - **gfw 段保留且不与 not-cn 合并（2026-11-20）**：gfw 段（4434）有 111 个不在 not-cn 的独有域名（如 api.steampowered.com）+ 36 个 gfw∩cn 冲突域名（富途系列，靠 gfw 段压过 cn 直连，对齐上游 gfw 早于 cn 的设计），故不能删；但 not-cn 段与 gfw 重复的 4287 条已去重（gfw 在前已命中，去重后两段 PROXY 并集恒 27339、first-match 不变）。当前 gfw 4434 / not-cn 22335 条。
 - **not-cn 遮蔽去重（2026-11-20）**：DOMAIN-SUFFIX 是后缀匹配，not-cn 段内若窄域名的真后缀已在前面输出为 PROXY（gfw 段或更早 not-cn 条目），该窄域名永远命中不到。convert.py 按 first-match 顺序维护 `proxy_emitted` 集合并跳过这类窄域名（如 `amp.akamaized.net` 被 `akamaized.net` 遮蔽）。本次去掉 570 条，被删者 0 例外均可由前置 PROXY 后缀解释，段内剩余遮蔽=0，first-match 结果不变。
+- **cn 遮蔽去重（2026-11-20）**：同法用于 cn 段，`direct_emitted` 集合跳过被前置 DIRECT 宽域遮蔽的窄域名，本次去掉 69 条（59 条被 itunes.apple.com/aliyun.com 等正常宽域遮蔽，10 条被裸 `cn` 遮蔽如 hospital.pku.edu.cn），0 例外、段内遮蔽=0、无重复。注：cn.lst 里 `*.cn` 域名仅 12 条（主体是 .com），裸 `cn` 在第 22767 位。
 - 跨策略重复（域名既在广告 REJECT 又在 GFW PROXY / CN DIRECT）是按 first-match 优先级命中的预期设计。
 
 ## GitHub Actions 要点
