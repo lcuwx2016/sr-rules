@@ -27,6 +27,7 @@
 - `actions/setup-python@v5` 用 `"3.12"`（ubuntu-latest 已切 26.04，3.8 缓存被移除会失败）。
 - tag 用 `data-YYYYMMDD`（重名时加时分秒后缀），Release 用 `softprops/action-gh-release@v2`，避免手工 curl。
 - 凭据：GitHub OAuth token 在 `~/.config/openchamber/github-auth.json` 的 `credentials[]`（`lcuwx2016` = `github.com#31233561`），用 curl API 建仓/触发 dispatch；本地 push 用 token 经 HTTPS（gh 当前登录的是 wx2020，不能直接用于 lcuwx2016）。
+- **公开仓不写设备/部署代号**：所有入库文件（含产物 conf 头部）禁用「GW」等内网设备名，统一用「上游分流体系 / 上游规则」——2026-11-20 用户明确要求。
 
 ## 已验证（2026-11-20）
 
